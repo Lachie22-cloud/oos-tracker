@@ -1,0 +1,2481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily OOS KPI Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<!-- Supabase SDK -->
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #0c0e13;
+  --bg-secondary: #13161d;
+  --bg-card: #181b24;
+  --bg-card-hover: #1e2230;
+  --bg-input: #1a1d27;
+  --border: #2a2e3a;
+  --border-light: #353a4a;
+  --text-primary: #e8eaf0;
+  --text-secondary: #8b90a0;
+  --text-muted: #5c6070;
+  --accent-blue: #4a90d9;
+  --accent-blue-dim: #2a5a99;
+  --accent-green: #3dbd7d;
+  --accent-green-dim: rgba(61,189,125,0.12);
+  --accent-red: #e05555;
+  --accent-red-dim: rgba(224,85,85,0.12);
+  --accent-amber: #e0a030;
+  --accent-amber-dim: rgba(224,160,48,0.12);
+  --accent-purple: #9077e0;
+  --new-badge: #e05555;
+  --resolved-badge: #3dbd7d;
+  --existing-badge: #e0a030;
+  --class-a: #e05555;
+  --class-b: #e0a030;
+  --class-c: #4a90d9;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-secondary); }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* Header */
+.header {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.header-icon {
+  width: 30px;
+  height: 30px;
+  background: linear-gradient(135deg, var(--accent-red), var(--accent-amber));
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -1px;
+}
+
+.header h1 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  color: var(--text-primary);
+}
+
+.header h1 span {
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 8px;
+  font-size: 12px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-date {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--bg-card);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+
+/* Navigation Tabs */
+.nav {
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+}
+
+.nav-tab {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  white-space: nowrap;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  font-family: inherit;
+}
+
+.nav-tab:hover {
+  color: var(--text-secondary);
+}
+
+.nav-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent-blue);
+}
+
+/* Main Content */
+.main {
+  padding: 12px 24px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+/* Import Section */
+.import-zone {
+  background: var(--bg-card);
+  border: 2px dashed var(--border-light);
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: center;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all 0.25s;
+  position: relative;
+}
+
+.import-zone:hover, .import-zone.dragover {
+  border-color: var(--accent-blue);
+  background: rgba(74,144,217,0.04);
+}
+
+.import-zone-icon {
+  font-size: 28px;
+  margin-bottom: 6px;
+  opacity: 0.6;
+}
+
+.import-zone h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.import-zone p {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.import-zone input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Status Bar */
+.status-bar {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 16px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.status-bar .status-text {
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.status-dot.inactive { background: var(--text-muted); animation: none; }
+
+.btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn:hover { background: var(--bg-card-hover); border-color: var(--border-light); }
+
+.btn-primary {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+}
+
+.btn-primary:hover { background: var(--accent-blue-dim); }
+
+.btn-danger {
+  background: var(--accent-red-dim);
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+}
+
+.btn-danger:hover { opacity: 0.8; }
+
+.btn-sm { padding: 5px 10px; font-size: 12px; }
+
+/* KPI Cards */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  transition: all 0.2s;
+}
+
+.kpi-card:hover {
+  border-color: var(--border-light);
+  transform: translateY(-1px);
+}
+
+.kpi-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.kpi-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.kpi-sub {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.kpi-card.total .kpi-value { color: var(--text-primary); }
+.kpi-card.new-card .kpi-value { color: var(--accent-red); }
+.kpi-card.new-card { border-left: 3px solid var(--accent-red); }
+.kpi-card.resolved-card .kpi-value { color: var(--accent-green); }
+.kpi-card.resolved-card { border-left: 3px solid var(--accent-green); }
+
+/* Breakdown grids */
+.breakdown-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.breakdown-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.breakdown-card h3 {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.breakdown-row:last-child { border-bottom: none; }
+
+.breakdown-row-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.breakdown-row-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.class-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.class-dot.a { background: var(--class-a); }
+.class-dot.b { background: var(--class-b); }
+.class-dot.c { background: var(--class-c); }
+
+/* Tables */
+.table-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.table-header {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.table-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.table-header .count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-input);
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.table-filters {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filter-input {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-size: 11px;
+  color: var(--text-primary);
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+  min-width: 120px;
+}
+
+.filter-input:focus { border-color: var(--accent-blue); }
+
+.table-scroll {
+  overflow-x: auto;
+  max-height: calc(100vh - 210px);
+  overflow-y: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+thead th {
+  background: var(--bg-secondary);
+  padding: 7px 10px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  white-space: nowrap;
+}
+
+tbody td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+tbody tr:hover { background: var(--bg-card-hover); }
+
+tbody tr.row-new {
+  background: rgba(224,85,85,0.04);
+}
+
+tbody tr.row-new:hover {
+  background: rgba(224,85,85,0.08);
+}
+
+.material-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.badge-new { background: var(--accent-red-dim); color: var(--accent-red); }
+.badge-existing { background: var(--accent-amber-dim); color: var(--accent-amber); }
+.badge-resolved { background: var(--accent-green-dim); color: var(--accent-green); }
+
+.class-badge {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
+  text-align: center;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.class-badge.a { background: rgba(224,85,85,0.15); color: var(--class-a); }
+.class-badge.b { background: rgba(224,160,48,0.15); color: var(--class-b); }
+.class-badge.c { background: rgba(74,144,217,0.15); color: var(--class-c); }
+
+.reason-select {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 6px;
+  font-size: 11px;
+  color: var(--text-primary);
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  min-width: 130px;
+}
+
+.reason-select:focus { border-color: var(--accent-blue); }
+
+.reason-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.reason-source-tag {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.reason-source-tag.auto {
+  background: rgba(144,119,224,0.15);
+  color: var(--accent-purple);
+}
+
+.reason-source-tag.manual {
+  background: rgba(74,144,217,0.15);
+  color: var(--accent-blue);
+}
+
+.days-out {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.days-high { color: var(--accent-red); }
+.days-med { color: var(--accent-amber); }
+.days-low { color: var(--text-secondary); }
+
+/* Charts */
+.chart-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+
+.chart-container h3 {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.chart-wrap {
+  position: relative;
+  height: 260px;
+}
+
+/* Projection Section */
+.projection-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.projection-input-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.projection-input-panel h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.proj-week-card {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.proj-week-card:last-of-type { margin-bottom: 0; }
+
+.proj-week-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.proj-week-range {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 10px;
+}
+
+.proj-input {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 18px;
+  color: var(--text-primary);
+  font-family: 'JetBrains Mono', monospace;
+  width: 100%;
+  text-align: center;
+  outline: none;
+  font-weight: 600;
+}
+
+.proj-input:focus { border-color: var(--accent-blue); }
+
+.proj-accuracy-table {
+  width: 100%;
+  font-size: 12px;
+}
+
+.proj-accuracy-table th {
+  text-align: left;
+  padding: 8px 10px;
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+
+.proj-accuracy-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.proj-accuracy-table tr:hover { background: var(--bg-card-hover); }
+
+.variance-positive { color: var(--accent-red); }
+.variance-negative { color: var(--accent-green); }
+.variance-zero { color: var(--text-muted); }
+
+.accuracy-bar {
+  display: inline-block;
+  height: 6px;
+  border-radius: 3px;
+  min-width: 4px;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+
+.proj-history-note {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* View container */
+.view { display: none; }
+.view.active { display: block; }
+
+/* Section titles */
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.3;
+}
+
+.empty-state h3 {
+  font-size: 16px;
+  margin-bottom: 8px;
+  color: var(--text-secondary);
+}
+
+.empty-state p {
+  font-size: 13px;
+}
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 20px;
+  font-size: 13px;
+  color: var(--text-primary);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transform: translateY(100px);
+  opacity: 0;
+  transition: all 0.3s ease;
+}
+
+.toast.show { transform: translateY(0); opacity: 1; }
+.toast.success { border-left: 3px solid var(--accent-green); }
+.toast.error { border-left: 3px solid var(--accent-red); }
+.toast.info { border-left: 3px solid var(--accent-blue); }
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+
+.modal-overlay.show { opacity: 1; pointer-events: all; }
+
+.modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: var(--shadow);
+}
+
+.modal h3 { font-size: 16px; margin-bottom: 16px; }
+.modal p { font-size: 13px; color: var(--text-secondary); margin-bottom: 16px; }
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* Export row */
+.export-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .main { padding: 16px; }
+  .header { padding: 0 16px; }
+  .nav { padding: 0 16px; }
+  .breakdown-grid { grid-template-columns: 1fr; }
+  .projection-grid { grid-template-columns: 1fr; }
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ── Login Screen ── */
+.login-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-primary);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.login-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 48px 40px;
+  text-align: center;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.4);
+}
+
+.login-card .header-icon {
+  width: 56px;
+  height: 56px;
+  font-size: 26px;
+  margin: 0 auto 20px;
+  border-radius: 14px;
+}
+
+.login-card h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.login-card p {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 28px;
+}
+
+.login-email-group {
+  text-align: left;
+  margin-bottom: 12px;
+}
+
+.login-email-group label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.login-email-group input {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text-primary);
+  font-family: inherit;
+  outline: none;
+}
+
+.login-email-group input:focus { border-color: var(--accent-blue); }
+
+.btn-google {
+  width: 100%;
+  padding: 12px 20px;
+  background: #fff;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: all 0.15s;
+}
+
+.btn-google:hover { background: #f5f5f5; }
+
+.btn-email-login {
+  width: 100%;
+  padding: 12px 20px;
+  background: var(--accent-blue);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  margin-top: 4px;
+  transition: all 0.15s;
+}
+
+.btn-email-login:hover { opacity: 0.9; }
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.login-error {
+  color: var(--accent-red);
+  font-size: 12px;
+  margin-top: 10px;
+  min-height: 18px;
+}
+
+.login-loading {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ── User Info in Header ── */
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--accent-blue-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-blue);
+}
+
+.user-name {
+  font-size: 12px;
+  color: var(--text-secondary);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-role {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(74,144,217,0.15);
+  color: var(--accent-blue);
+}
+
+.btn-signout {
+  padding: 5px 10px;
+  font-size: 11px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.btn-signout:hover { border-color: var(--accent-red); color: var(--accent-red); }
+
+/* ── Import Lock Banner ── */
+.import-lock-banner {
+  background: var(--accent-amber-dim);
+  border: 1px solid var(--accent-amber);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--accent-amber);
+  display: none;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Sync indicator ── */
+.sync-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-green);
+  display: inline-block;
+  margin-right: 4px;
+}
+.sync-dot.syncing {
+  background: var(--accent-amber);
+  animation: pulse 1s infinite;
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="header-icon">OS</div>
+    <h2>OOS KPI Tracker</h2>
+    <p>Sign in to access the daily stock-out dashboard</p>
+    <button class="btn-google" onclick="signInWithGoogle()">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Sign in with Google
+    </button>
+    <button class="btn-google" onclick="signInWithMicrosoft()" style="background:#2f2f2f; color:#fff; border-color:#2f2f2f;">
+      <svg width="18" height="18" viewBox="0 0 21 21"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg>
+      Sign in with Microsoft
+    </button>
+    <div class="login-divider">or use email</div>
+    <div class="login-email-group">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="you@company.com">
+    </div>
+    <div class="login-email-group">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="Password" onkeydown="if(event.key==='Enter')signInWithEmail()">
+    </div>
+    <button class="btn-email-login" onclick="signInWithEmail()">Sign In</button>
+    <div class="login-error" id="loginError"></div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="header-icon">OS</div>
+    <h1>OOS Tracker <span>Daily Stock-Out KPI</span></h1>
+  </div>
+  <div class="header-right">
+    <span class="sync-dot" id="syncDot" title="Connected"></span>
+    <div class="header-date" id="headerDate"></div>
+    <div class="user-info" id="userInfo" style="display:none;">
+      <div class="user-avatar" id="userAvatar"></div>
+      <span class="user-name" id="userName"></span>
+      <span class="user-role" id="userRole"></span>
+      <button class="btn-signout" onclick="signOutUser()">Sign Out</button>
+    </div>
+    <button class="btn btn-danger btn-sm" id="btnReset" style="display:none;" onclick="showResetModal()">⟳ Reset All Data</button>
+  </div>
+</div>
+
+<!-- NAVIGATION -->
+<div class="nav">
+  <button class="nav-tab active" data-view="dashboard" onclick="switchView('dashboard')">◉ Dashboard</button>
+  <button class="nav-tab" data-view="current" onclick="switchView('current')">▣ Current OOS</button>
+  <button class="nav-tab" data-view="new" onclick="switchView('new')">▲ New Today</button>
+  <button class="nav-tab" data-view="resolved" onclick="switchView('resolved')">✓ Resolved</button>
+  <button class="nav-tab" data-view="trends" onclick="switchView('trends')">⟋ Trends</button>
+  <button class="nav-tab" data-view="projections" onclick="switchView('projections')">◎ Projections</button>
+  <button class="nav-tab" data-view="history" onclick="switchView('history')">☰ History</button>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+  <!-- Status Bar -->
+  <div class="status-bar" id="statusBar" style="display:none;">
+    <div class="status-text">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">No data loaded</span>
+    </div>
+    <div class="export-row">
+      <button class="btn btn-sm" onclick="exportCurrentView()">⬇ Export View</button>
+    </div>
+  </div>
+
+  <!-- ==================== VIEW: DASHBOARD ==================== -->
+  <div class="view active" id="view-dashboard">
+    <!-- Import Lock Banner (dashboard only) -->
+    <div class="import-lock-banner" id="importLockBanner">
+      ⚠ Import in progress by <strong id="lockUser"></strong>. Please wait...
+    </div>
+
+    <!-- Import Zone (dashboard only) -->
+    <div class="import-zone" id="importZone">
+      <div class="import-zone-icon">📂</div>
+      <h3>Import Today's Stock-Out Extract</h3>
+      <p>Drag & drop your .xlsx file here, or click to browse</p>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" onchange="handleFileImport(event)">
+    </div>
+
+    <!-- Hidden file input for Load New Day button -->
+    <input type="file" id="fileInput2" accept=".xlsx,.xls,.csv" onchange="handleFileImport(event)" style="display:none">
+
+    <div id="dashboardContent">
+      <div class="empty-state">
+        <div class="empty-state-icon">📊</div>
+        <h3>No Data Loaded</h3>
+        <p>Import your first daily extract to get started</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== VIEW: CURRENT OOS ==================== -->
+  <div class="view" id="view-current">
+    <div id="currentContent">
+      <div class="empty-state">
+        <div class="empty-state-icon">📋</div>
+        <h3>No Current Stock-Outs</h3>
+        <p>Import today's extract to view active stock-outs</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== VIEW: NEW TODAY ==================== -->
+  <div class="view" id="view-new">
+    <div id="newContent">
+      <div class="empty-state">
+        <div class="empty-state-icon">▲</div>
+        <h3>No New Stock-Outs</h3>
+        <p>New items will appear here after comparison with prior day</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== VIEW: RESOLVED ==================== -->
+  <div class="view" id="view-resolved">
+    <div id="resolvedContent">
+      <div class="empty-state">
+        <div class="empty-state-icon">✓</div>
+        <h3>No Resolved Stock-Outs</h3>
+        <p>Resolved items will appear here after comparison</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== VIEW: TRENDS ==================== -->
+  <div class="view" id="view-trends">
+    <div id="trendsContent">
+      <div class="chart-container">
+        <h3>Stock-Out Trend — Daily Totals</h3>
+        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+      </div>
+      <div class="chart-container">
+        <h3>Stock-Outs by ABC Class — Daily</h3>
+        <div class="chart-wrap"><canvas id="classChart"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== VIEW: PROJECTIONS ==================== -->
+  <div class="view" id="view-projections">
+    <div id="projectionsContent">
+      <div class="projection-grid">
+        <div>
+          <div class="projection-input-panel" style="margin-bottom:20px;">
+            <h3>Weekly Forecast Entry</h3>
+            <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">Enter projected total stock-outs for each week. Saved as a rolling forecast — historical entries are never overwritten.</p>
+            <div id="projectionInputCards"></div>
+            <button class="btn btn-primary btn-sm" style="margin-top:14px; width:100%;" onclick="saveWeeklyProjections()">Save Projections</button>
+            <div class="proj-history-note" id="projHistoryNote"></div>
+          </div>
+          <div class="chart-container">
+            <h3>Projection Accuracy Over Time</h3>
+            <div class="chart-wrap" style="height:220px;"><canvas id="accuracyChart"></canvas></div>
+          </div>
+        </div>
+        <div>
+          <div class="chart-container" style="margin-bottom:20px;">
+            <h3>Weekly Trend — Projected vs Actual</h3>
+            <div class="chart-wrap"><canvas id="projChart"></canvas></div>
+          </div>
+          <div class="table-container">
+            <div class="table-header">
+              <h3>Projection Accuracy Log</h3>
+              <span class="count" id="projAccCount">0 weeks</span>
+            </div>
+            <div class="table-scroll" style="max-height:400px;">
+              <table class="proj-accuracy-table" id="projAccuracyTable">
+                <thead><tr>
+                  <th>Week</th><th>Entered On</th><th>Projected</th><th>Actual</th><th>Variance</th><th>% Error</th><th>Accuracy</th>
+                </tr></thead>
+                <tbody id="projAccuracyBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== VIEW: HISTORY ==================== -->
+  <div class="view" id="view-history">
+    <div id="historyContent">
+      <div class="table-container">
+        <div class="table-header">
+          <h3>Historical Records</h3>
+          <span class="count" id="historyCount">0 records</span>
+        </div>
+        <div class="table-filters">
+          <input class="filter-input" type="text" placeholder="Search material..." id="histFilterMat" oninput="renderHistory()">
+          <select class="filter-input" id="histFilterStatus" onchange="renderHistory()">
+            <option value="">All Status</option>
+            <option value="Active">Active</option>
+            <option value="Resolved">Resolved</option>
+          </select>
+          <select class="filter-input" id="histFilterClass" onchange="renderHistory()">
+            <option value="">All Classes</option>
+            <option value="A">Class A</option>
+            <option value="B">Class B</option>
+            <option value="C">Class C</option>
+          </select>
+        </div>
+        <div class="table-scroll" id="historyTableWrap"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reset Modal -->
+<div class="modal-overlay" id="resetModal">
+  <div class="modal">
+    <h3>⚠ Reset All Data</h3>
+    <p>This will permanently delete all stored snapshots, history, reasons, and projections. This cannot be undone.</p>
+    <div class="modal-actions">
+      <button class="btn" onclick="hideResetModal()">Cancel</button>
+      <button class="btn btn-danger" onclick="resetAllData()">Yes, Reset Everything</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===================================================================
+// ██ SUPABASE CONFIG
+// ===================================================================
+const SUPABASE_URL = 'https://fgqzfcwluvnvrvaselmd.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZncXpmY3dsdXZudnJ2YXNlbG1kIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxNzAxNDgsImV4cCI6MjA4ODc0NjE0OH0.KREKt95H3Sz9E58hlNyM4CZ9DaWlB9BrL3Uj2JvKoqk';
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ===================================================================
+// ██ CONSTANTS
+// ===================================================================
+const REASONS = [
+  '', 'Packaging delay', 'Raw material delay', 'Over-forecast',
+  'Production issue', 'Supplier issue', 'Logistics issue', 'Quality hold', 'Planner Error', 'Other'
+];
+
+const HEADER_MAP = {
+  'Div': 'div',
+  'Planning material': 'planningMaterial',
+  'Material': 'material',
+  'Material description': 'description',
+  'Plant': 'plant',
+  'ABC Indicator': 'abcClass',
+  'Sales MTD %': 'salesMtd'
+};
+
+// ===================================================================
+// ██ STATE
+// ===================================================================
+let store = {
+  snapshots: {},
+  reasons: {},
+  reasonSources: {},
+  firstSeen: {},
+  dailyTotals: {},
+  projections: [],
+  lastLoadDate: null,
+  history: []
+};
+
+let currentViewData = { current: [], newItems: [], resolved: [] };
+let currentUser = null;
+let currentRole = 'viewer';
+
+// ===================================================================
+// ██ AUTHENTICATION
+// ===================================================================
+async function signInWithGoogle() {
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin + window.location.pathname }
+  });
+  if (error) document.getElementById('loginError').textContent = error.message;
+}
+
+async function signInWithMicrosoft() {
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'azure',
+    options: {
+      redirectTo: window.location.origin + window.location.pathname,
+      scopes: 'email profile'
+    }
+  });
+  if (error) document.getElementById('loginError').textContent = error.message;
+}
+
+async function signInWithEmail() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  if (!email || !password) {
+    document.getElementById('loginError').textContent = 'Enter email and password';
+    return;
+  }
+  document.getElementById('loginError').textContent = '';
+
+  // Try sign in
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) {
+    if (error.message.includes('Invalid login') || error.message.includes('invalid_credentials')) {
+      // Create account
+      const { error: err2 } = await sb.auth.signUp({ email, password });
+      if (err2) document.getElementById('loginError').textContent = err2.message;
+    } else {
+      document.getElementById('loginError').textContent = error.message;
+    }
+  }
+}
+
+async function signOutUser() {
+  await sb.auth.signOut();
+  currentUser = null;
+  currentRole = 'viewer';
+  document.getElementById('loginOverlay').style.display = 'flex';
+  document.getElementById('userInfo').style.display = 'none';
+}
+
+// Auth state listener
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (session?.user) {
+    currentUser = session.user;
+    document.getElementById('loginOverlay').style.display = 'none';
+    await setupUserProfile();
+    showUserUI();
+    await loadAllData();
+    subscribeRealtime();
+  } else {
+    currentUser = null;
+    currentRole = 'viewer';
+    document.getElementById('loginOverlay').style.display = 'flex';
+    document.getElementById('userInfo').style.display = 'none';
+  }
+});
+
+async function setupUserProfile() {
+  // Check if profile exists
+  const { data: existing } = await sb.from('user_profiles').select('*').eq('id', currentUser.id).single();
+
+  if (!existing) {
+    // First-time user — check if first user overall
+    const { count } = await sb.from('user_profiles').select('*', { count: 'exact', head: true });
+    const role = count === 0 ? 'admin' : 'editor';
+
+    await sb.from('user_profiles').insert({
+      id: currentUser.id,
+      email: currentUser.email || '',
+      display_name: currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email || '',
+      role: role
+    });
+    currentRole = role;
+  } else {
+    currentRole = existing.role || 'editor';
+    // Update last login
+    await sb.from('user_profiles').update({ last_login: new Date().toISOString() }).eq('id', currentUser.id);
+  }
+}
+
+function showUserUI() {
+  const name = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email || 'User';
+  const initials = name.split(/[\s@]/).filter(Boolean).slice(0, 2).map(s => s[0].toUpperCase()).join('');
+  document.getElementById('userAvatar').textContent = initials;
+  document.getElementById('userName').textContent = name;
+  document.getElementById('userRole').textContent = currentRole;
+  document.getElementById('userInfo').style.display = 'flex';
+  document.getElementById('btnReset').style.display = currentRole === 'admin' ? '' : 'none';
+  if (currentRole === 'viewer') {
+    document.getElementById('importZone').style.display = 'none';
+  }
+}
+
+function canEdit() {
+  return currentRole === 'editor' || currentRole === 'admin';
+}
+
+// ===================================================================
+// ██ DATA LOADING
+// ===================================================================
+async function loadAllData() {
+  setSyncStatus('syncing');
+
+  try {
+    const [snapRes, reasonsRes, firstSeenRes, totalsRes, projRes, histRes, stateRes] = await Promise.all([
+      sb.from('snapshots').select('*'),
+      sb.from('reasons').select('*'),
+      sb.from('first_seen').select('*'),
+      sb.from('daily_totals').select('*'),
+      sb.from('projections').select('*').order('id'),
+      sb.from('history').select('*').order('id'),
+      sb.from('app_state').select('*')
+    ]);
+
+    // Convert to store format
+    store.snapshots = {};
+    (snapRes.data || []).forEach(s => store.snapshots[s.date] = s.items);
+
+    store.reasons = {};
+    store.reasonSources = {};
+    (reasonsRes.data || []).forEach(r => {
+      store.reasons[r.key] = r.reason;
+      store.reasonSources[r.key] = r.source;
+    });
+
+    store.firstSeen = {};
+    (firstSeenRes.data || []).forEach(f => store.firstSeen[f.key] = f.date);
+
+    store.dailyTotals = {};
+    (totalsRes.data || []).forEach(t => {
+      store.dailyTotals[t.date] = { total: t.total, new: t.new_count, resolved: t.resolved, a: t.a, b: t.b, c: t.c };
+    });
+
+    store.projections = (projRes.data || []).map(p => ({
+      entryDate: p.entry_date, weekStart: p.week_start, weekEnd: p.week_end, projected: p.projected
+    }));
+
+    store.history = (histRes.data || []).map(h => ({
+      date: h.date, material: h.material, plant: h.plant, description: h.description,
+      abcClass: h.abc_class, status: h.status, reason: h.reason, div: h.div,
+      planningMaterial: h.planning_material, salesMtd: h.sales_mtd
+    }));
+
+    store.lastLoadDate = null;
+    (stateRes.data || []).forEach(s => {
+      if (s.key === 'lastLoadDate' && s.value && s.value !== 'null') store.lastLoadDate = s.value;
+    });
+
+    setSyncStatus('connected');
+    onDataReady();
+  } catch (err) {
+    console.error('Load error:', err);
+    setSyncStatus('connected');
+  }
+}
+
+// ===================================================================
+// ██ REALTIME SUBSCRIPTIONS
+// ===================================================================
+let realtimeChannel = null;
+
+function subscribeRealtime() {
+  if (realtimeChannel) sb.removeChannel(realtimeChannel);
+
+  realtimeChannel = sb.channel('db-changes')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'snapshots' }, () => loadAllData())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'reasons' }, () => loadAllData())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_totals' }, () => loadAllData())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'projections' }, () => loadAllData())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'app_state' }, payload => {
+      // Check import lock
+      if (payload.new && payload.new.key === 'importLock') {
+        const lock = payload.new.value;
+        const banner = document.getElementById('importLockBanner');
+        if (lock && lock !== 'null' && lock.uid !== currentUser?.id) {
+          document.getElementById('lockUser').textContent = lock.displayName || lock.email || 'another user';
+          banner.style.display = 'flex';
+        } else {
+          banner.style.display = 'none';
+        }
+      }
+    })
+    .subscribe();
+}
+
+function setSyncStatus(status) {
+  const dot = document.getElementById('syncDot');
+  if (!dot) return;
+  dot.className = status === 'syncing' ? 'sync-dot syncing' : 'sync-dot';
+  dot.title = status === 'syncing' ? 'Syncing...' : 'Connected';
+}
+
+function onDataReady() {
+  if (store.lastLoadDate) {
+    recomputeCurrentView();
+    refreshAll();
+    document.getElementById('statusBar').style.display = 'flex';
+    document.getElementById('importZone').style.display = 'none';
+  } else if (!canEdit()) {
+    document.getElementById('importZone').style.display = 'none';
+  }
+  updateHeaderDate();
+  renderWeeklyProjectionUI();
+  setupDragDrop();
+}
+
+// ===================================================================
+// ██ INITIALIZATION
+// ===================================================================
+document.addEventListener('DOMContentLoaded', () => {
+  updateHeaderDate();
+  setupDragDrop();
+});
+
+function updateHeaderDate() {
+  document.getElementById('headerDate').textContent = new Date().toLocaleDateString('en-AU', {
+    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric'
+  });
+}
+
+function setupDragDrop() {
+  const zone = document.getElementById('importZone');
+  if (!zone) return;
+  ['dragenter','dragover'].forEach(e => zone.addEventListener(e, ev => { ev.preventDefault(); zone.classList.add('dragover'); }));
+  ['dragleave','drop'].forEach(e => zone.addEventListener(e, ev => { ev.preventDefault(); zone.classList.remove('dragover'); }));
+  zone.addEventListener('drop', ev => {
+    const file = ev.dataTransfer.files[0];
+    if (file) processFile(file);
+  });
+}
+
+// ===================================================================
+// ██ FILE IMPORT (writes to Supabase)
+// ===================================================================
+function handleFileImport(event) {
+  const file = event.target.files[0];
+  if (file) processFile(file);
+  event.target.value = '';
+}
+
+function processFile(file) {
+  if (!canEdit()) { showToast('You do not have edit permissions', 'error'); return; }
+
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws);
+
+      if (json.length === 0) { showToast('File is empty', 'error'); return; }
+
+      const mapped = json.map(row => {
+        const out = {};
+        for (const [excelKey, appKey] of Object.entries(HEADER_MAP)) {
+          out[appKey] = row[excelKey] !== undefined ? String(row[excelKey]).trim() : '';
+        }
+        return out;
+      }).filter(r => r.material);
+
+      const today = new Date().toISOString().slice(0, 10);
+
+      // Set import lock
+      await sb.from('app_state').upsert({
+        key: 'importLock',
+        value: { uid: currentUser.id, email: currentUser.email, displayName: currentUser.user_metadata?.full_name || currentUser.email, timestamp: Date.now() }
+      });
+
+      await importSnapshot(today, mapped);
+
+    } catch (err) {
+      console.error(err);
+      showToast('Error reading file: ' + err.message, 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function importSnapshot(date, items) {
+  setSyncStatus('syncing');
+
+  const sortedDates = Object.keys(store.snapshots).sort();
+  const prevDate = sortedDates.length > 0 ? sortedDates[sortedDates.length - 1] : null;
+  const prevItems = prevDate ? store.snapshots[prevDate] : [];
+
+  const todayKeys = new Set(items.map(i => makeKey(i)));
+  const prevKeys = new Set(prevItems.map(i => makeKey(i)));
+
+  const newKeys = new Set();
+  const resolvedKeys = new Set();
+  todayKeys.forEach(k => { if (!prevKeys.has(k)) newKeys.add(k); });
+  prevKeys.forEach(k => { if (!todayKeys.has(k)) resolvedKeys.add(k); });
+
+  try {
+    // 1. Upsert snapshot
+    await sb.from('snapshots').upsert({ date, items });
+
+    // 2. Upsert first seen
+    const newFirstSeen = [];
+    todayKeys.forEach(k => {
+      if (!store.firstSeen[k]) newFirstSeen.push({ key: k, date });
+    });
+    if (newFirstSeen.length > 0) {
+      await sb.from('first_seen').upsert(newFirstSeen, { onConflict: 'key', ignoreDuplicates: true });
+    }
+
+    // 3. Auto-reason: Over-forecast
+    const reasonUpserts = [];
+    items.forEach(i => {
+      const key = makeKey(i);
+      const salesPct = parseFloat(i.salesMtd);
+      if (!isNaN(salesPct) && salesPct > 1.0 && store.reasonSources[key] !== 'Manual') {
+        reasonUpserts.push({ key, reason: 'Over-forecast', source: 'Auto' });
+      }
+    });
+    if (reasonUpserts.length > 0) {
+      await sb.from('reasons').upsert(reasonUpserts, { onConflict: 'key' });
+    }
+
+    // 4. Daily totals
+    let aCount = 0, bCount = 0, cCount = 0;
+    items.forEach(i => {
+      const cls = (i.abcClass || '').toUpperCase();
+      if (cls === 'A') aCount++;
+      else if (cls === 'B') bCount++;
+      else cCount++;
+    });
+    await sb.from('daily_totals').upsert({
+      date, total: items.length, new_count: newKeys.size, resolved: resolvedKeys.size,
+      a: aCount, b: bCount, c: cCount
+    });
+
+    // 5. History records
+    const historyRows = [];
+    items.forEach(i => {
+      const key = makeKey(i);
+      const autoReason = reasonUpserts.find(r => r.key === key);
+      historyRows.push({
+        date, material: i.material, plant: i.plant, description: i.description,
+        abc_class: i.abcClass, status: 'Active',
+        reason: store.reasons[key] || (autoReason ? autoReason.reason : ''),
+        div: i.div, planning_material: i.planningMaterial, sales_mtd: i.salesMtd
+      });
+    });
+
+    if (prevDate) {
+      prevItems.forEach(i => {
+        const key = makeKey(i);
+        if (resolvedKeys.has(key)) {
+          historyRows.push({
+            date, material: i.material, plant: i.plant, description: i.description,
+            abc_class: i.abcClass, status: 'Resolved', reason: store.reasons[key] || '',
+            div: i.div, planning_material: i.planningMaterial, sales_mtd: i.salesMtd || ''
+          });
+        }
+      });
+    }
+
+    if (historyRows.length > 0) {
+      await sb.from('history').insert(historyRows);
+    }
+
+    // 6. Update lastLoadDate
+    await sb.from('app_state').upsert({ key: 'lastLoadDate', value: JSON.stringify(date) });
+
+    // 7. Clear import lock
+    await sb.from('app_state').upsert({ key: 'importLock', value: 'null' });
+
+    // Reload data
+    await loadAllData();
+
+    setSyncStatus('connected');
+    showToast(`Imported ${items.length} stock-outs for ${date}`, 'success');
+    document.getElementById('importZone').style.display = 'none';
+    document.getElementById('statusBar').style.display = 'flex';
+
+  } catch (err) {
+    console.error('Import error:', err);
+    setSyncStatus('connected');
+    showToast('Import error: ' + err.message, 'error');
+    await sb.from('app_state').upsert({ key: 'importLock', value: 'null' });
+  }
+}
+
+function makeKey(item) {
+  return `${item.material}|${item.plant}`;
+}
+
+// ===================================================================
+// ██ COMPUTE CURRENT VIEW STATE
+// ===================================================================
+function recomputeCurrentView() {
+  const sortedDates = Object.keys(store.snapshots).sort();
+  if (sortedDates.length === 0) return;
+
+  const latestDate = sortedDates[sortedDates.length - 1];
+  const prevDate = sortedDates.length > 1 ? sortedDates[sortedDates.length - 2] : null;
+
+  const todayItems = store.snapshots[latestDate] || [];
+  const prevItems = prevDate ? (store.snapshots[prevDate] || []) : [];
+
+  const prevKeys = new Set(prevItems.map(i => makeKey(i)));
+  const todayKeys = new Set(todayItems.map(i => makeKey(i)));
+
+  currentViewData.current = todayItems.map(item => {
+    const key = makeKey(item);
+    const isNew = !prevKeys.has(key);
+    const firstSeen = store.firstSeen[key] || latestDate;
+    const daysOut = Math.max(1, Math.round((new Date(latestDate) - new Date(firstSeen)) / 86400000) + 1);
+    return {
+      ...item, key,
+      status: isNew ? 'New' : 'Existing',
+      daysOut, firstSeen,
+      reason: store.reasons[key] || '',
+      reasonSource: store.reasonSources[key] || ''
+    };
+  });
+
+  currentViewData.newItems = currentViewData.current.filter(i => i.status === 'New');
+
+  currentViewData.resolved = prevItems
+    .filter(i => !todayKeys.has(makeKey(i)))
+    .map(i => {
+      const key = makeKey(i);
+      return {
+        ...i, key, status: 'Resolved',
+        reason: store.reasons[key] || '',
+        reasonSource: store.reasonSources[key] || '',
+        firstSeen: store.firstSeen[key] || prevDate
+      };
+    });
+}
+
+// ===================================================================
+// ██ REFRESH ALL VIEWS
+// ===================================================================
+function refreshAll() {
+  renderDashboard();
+  renderCurrentTable();
+  renderNewTable();
+  renderResolvedTable();
+  renderTrendCharts();
+  renderWeeklyProjectionUI();
+  renderWeeklyProjectionCharts();
+  renderProjectionAccuracyTable();
+  renderHistory();
+  updateStatusBar();
+}
+
+function updateStatusBar() {
+  const dates = Object.keys(store.snapshots).sort();
+  if (dates.length === 0) {
+    document.getElementById('statusText').textContent = 'No data loaded';
+    document.getElementById('statusDot').classList.add('inactive');
+    return;
+  }
+  const latest = dates[dates.length - 1];
+  const total = store.dailyTotals[latest]?.total || 0;
+  document.getElementById('statusText').textContent =
+    `Latest: ${formatDate(latest)} — ${total} active stock-outs — ${dates.length} day(s) of history`;
+  document.getElementById('statusDot').classList.remove('inactive');
+}
+
+// ===================================================================
+// ██ DASHBOARD
+// ===================================================================
+function renderDashboard() {
+  const dates = Object.keys(store.snapshots).sort();
+  if (dates.length === 0) return;
+
+  const latest = dates[dates.length - 1];
+  const dt = store.dailyTotals[latest] || {};
+  const curr = currentViewData.current;
+
+  const reasonCounts = {};
+  curr.forEach(i => {
+    const r = i.reason || 'Unassigned';
+    reasonCounts[r] = (reasonCounts[r] || 0) + 1;
+  });
+
+  const el = document.getElementById('dashboardContent');
+  el.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+      <div class="section-title" style="margin-bottom:0; border-bottom:none; padding-bottom:0;">KPI Summary — ${formatDate(latest)}</div>
+      ${canEdit() ? '<button class="btn btn-sm btn-primary" onclick="document.getElementById(\'fileInput2\').click()">📂 Load New Day</button>' : ''}
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi-card total">
+        <div class="kpi-label">Total Stock-Outs</div>
+        <div class="kpi-value">${dt.total || 0}</div>
+        <div class="kpi-sub">Active items today</div>
+      </div>
+      <div class="kpi-card new-card">
+        <div class="kpi-label">New Today</div>
+        <div class="kpi-value">${dt.new || 0}</div>
+        <div class="kpi-sub">Not in prior day</div>
+      </div>
+      <div class="kpi-card resolved-card">
+        <div class="kpi-label">Resolved Today</div>
+        <div class="kpi-value">${dt.resolved || 0}</div>
+        <div class="kpi-sub">Back in stock</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Days Tracked</div>
+        <div class="kpi-value" style="color:var(--accent-blue)">${dates.length}</div>
+        <div class="kpi-sub">Snapshots loaded</div>
+      </div>
+    </div>
+
+    <div class="breakdown-grid">
+      <div class="breakdown-card">
+        <h3>By ABC Class</h3>
+        <div class="breakdown-row">
+          <div class="breakdown-row-label"><div class="class-dot a"></div> Class A (Critical)</div>
+          <div class="breakdown-row-value" style="color:var(--class-a)">${dt.a || 0}</div>
+        </div>
+        <div class="breakdown-row">
+          <div class="breakdown-row-label"><div class="class-dot b"></div> Class B (Important)</div>
+          <div class="breakdown-row-value" style="color:var(--class-b)">${dt.b || 0}</div>
+        </div>
+        <div class="breakdown-row">
+          <div class="breakdown-row-label"><div class="class-dot c"></div> Class C (Standard)</div>
+          <div class="breakdown-row-value" style="color:var(--class-c)">${dt.c || 0}</div>
+        </div>
+      </div>
+      <div class="breakdown-card">
+        <h3>By Reason</h3>
+        ${Object.entries(reasonCounts).sort((a,b) => b[1]-a[1]).map(([reason, count]) => `
+          <div class="breakdown-row">
+            <div class="breakdown-row-label">${reason}</div>
+            <div class="breakdown-row-value">${count}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <h3>Daily Trend — Quick View</h3>
+      <div class="chart-wrap" style="height:180px;"><canvas id="dashTrendChart"></canvas></div>
+    </div>
+  `;
+  renderMiniTrend();
+}
+
+function renderMiniTrend() {
+  const canvas = document.getElementById('dashTrendChart');
+  if (!canvas) return;
+  const dates = Object.keys(store.dailyTotals).sort();
+  if (dates.length === 0) return;
+
+  new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: dates.map(formatDate),
+      datasets: [{
+        label: 'Total OOS',
+        data: dates.map(d => store.dailyTotals[d].total),
+        borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.1)',
+        fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: '#4a90d9', borderWidth: 2
+      }]
+    },
+    options: chartOptions()
+  });
+}
+
+// ===================================================================
+// ██ CURRENT OOS TABLE
+// ===================================================================
+function renderCurrentTable() {
+  const items = currentViewData.current;
+  if (items.length === 0) {
+    document.getElementById('currentContent').innerHTML = `
+      <div class="empty-state"><div class="empty-state-icon">📋</div><h3>No Current Stock-Outs</h3></div>`;
+    return;
+  }
+
+  document.getElementById('currentContent').innerHTML = `
+    <div class="table-container">
+      <div class="table-header">
+        <h3>All Active Stock-Outs</h3>
+        <span class="count">${items.length} items</span>
+      </div>
+      <div class="table-filters">
+        <input class="filter-input" type="text" placeholder="Search material..." id="currFilterMat" oninput="filterCurrentTable()">
+        <select class="filter-input" id="currFilterClass" onchange="filterCurrentTable()">
+          <option value="">All Classes</option>
+          <option value="A">A</option><option value="B">B</option><option value="C">C</option>
+        </select>
+        <select class="filter-input" id="currFilterStatus" onchange="filterCurrentTable()">
+          <option value="">All Status</option>
+          <option value="New">New</option><option value="Existing">Existing</option>
+        </select>
+        <select class="filter-input" id="currFilterPlant" onchange="filterCurrentTable()">
+          <option value="">All Plants</option>
+          ${[...new Set(items.map(i => i.plant))].sort().map(p => `<option value="${p}">${p}</option>`).join('')}
+        </select>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Status</th><th>Material</th><th>Description</th><th>Plant</th>
+            <th>Class</th><th>Days Out</th><th>First Seen</th><th>Reason</th><th>Source</th><th>Sales MTD %</th>
+          </tr></thead>
+          <tbody id="currentTableBody">${renderCurrentRows(items)}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+function renderCurrentRows(items) {
+  const editable = canEdit();
+  return items
+    .sort((a,b) => {
+      if (a.status === 'New' && b.status !== 'New') return -1;
+      if (b.status === 'New' && a.status !== 'New') return 1;
+      const classOrder = {A:0, B:1, C:2};
+      return (classOrder[a.abcClass] || 2) - (classOrder[b.abcClass] || 2);
+    })
+    .map(item => `
+      <tr class="${item.status === 'New' ? 'row-new' : ''}">
+        <td><span class="badge badge-${item.status.toLowerCase()}">${item.status}</span></td>
+        <td class="material-code">${item.material}</td>
+        <td>${item.description}</td>
+        <td class="material-code">${item.plant}</td>
+        <td><span class="class-badge ${item.abcClass.toLowerCase()}">${item.abcClass}</span></td>
+        <td><span class="days-out ${item.daysOut >= 7 ? 'days-high' : item.daysOut >= 3 ? 'days-med' : 'days-low'}">${item.daysOut}</span></td>
+        <td style="font-size:11px; color:var(--text-muted)">${formatDate(item.firstSeen)}</td>
+        <td>
+          <select class="reason-select" onchange="setReason('${item.key}', this.value)" ${editable ? '' : 'disabled'}>
+            ${REASONS.map(r => `<option value="${r}" ${item.reason === r ? 'selected' : ''}>${r || '— Select —'}</option>`).join('')}
+          </select>
+        </td>
+        <td>${item.reasonSource ? `<span class="reason-source-tag ${item.reasonSource.toLowerCase()}">${item.reasonSource}</span>` : ''}</td>
+        <td class="material-code">${item.salesMtd ? (parseFloat(item.salesMtd)*100).toFixed(1) + '%' : '—'}</td>
+      </tr>
+    `).join('');
+}
+
+function filterCurrentTable() {
+  const matFilter = (document.getElementById('currFilterMat')?.value || '').toLowerCase();
+  const classFilter = document.getElementById('currFilterClass')?.value || '';
+  const statusFilter = document.getElementById('currFilterStatus')?.value || '';
+  const plantFilter = document.getElementById('currFilterPlant')?.value || '';
+
+  const filtered = currentViewData.current.filter(item => {
+    if (matFilter && !item.material.toLowerCase().includes(matFilter) && !item.description.toLowerCase().includes(matFilter)) return false;
+    if (classFilter && item.abcClass.toUpperCase() !== classFilter) return false;
+    if (statusFilter && item.status !== statusFilter) return false;
+    if (plantFilter && item.plant !== plantFilter) return false;
+    return true;
+  });
+
+  const tbody = document.getElementById('currentTableBody');
+  if (tbody) tbody.innerHTML = renderCurrentRows(filtered);
+}
+
+// ===================================================================
+// ██ NEW OOS TABLE
+// ===================================================================
+function renderNewTable() {
+  const items = currentViewData.newItems;
+  const editable = canEdit();
+  if (items.length === 0) {
+    document.getElementById('newContent').innerHTML = `
+      <div class="empty-state"><div class="empty-state-icon">✓</div><h3>No New Stock-Outs Today</h3></div>`;
+    return;
+  }
+
+  document.getElementById('newContent').innerHTML = `
+    <div class="table-container">
+      <div class="table-header">
+        <h3>New Stock-Outs — Appeared Today</h3>
+        <span class="count" style="background:var(--accent-red-dim); color:var(--accent-red)">${items.length} new</span>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Material</th><th>Description</th><th>Plant</th><th>Div</th>
+            <th>Class</th><th>Reason</th><th>Source</th><th>Sales MTD %</th>
+          </tr></thead>
+          <tbody>
+            ${items.map(item => `
+              <tr class="row-new">
+                <td class="material-code">${item.material}</td>
+                <td>${item.description}</td>
+                <td class="material-code">${item.plant}</td>
+                <td>${item.div}</td>
+                <td><span class="class-badge ${item.abcClass.toLowerCase()}">${item.abcClass}</span></td>
+                <td><select class="reason-select" onchange="setReason('${item.key}', this.value)" ${editable ? '' : 'disabled'}>
+                    ${REASONS.map(r => `<option value="${r}" ${item.reason === r ? 'selected' : ''}>${r || '— Select —'}</option>`).join('')}
+                  </select></td>
+                <td>${item.reasonSource ? `<span class="reason-source-tag ${item.reasonSource.toLowerCase()}">${item.reasonSource}</span>` : ''}</td>
+                <td class="material-code">${item.salesMtd ? (parseFloat(item.salesMtd)*100).toFixed(1) + '%' : '—'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ===================================================================
+// ██ RESOLVED OOS TABLE
+// ===================================================================
+function renderResolvedTable() {
+  const items = currentViewData.resolved;
+  if (items.length === 0) {
+    document.getElementById('resolvedContent').innerHTML = `
+      <div class="empty-state"><div class="empty-state-icon">📦</div><h3>No Resolved Stock-Outs</h3></div>`;
+    return;
+  }
+
+  document.getElementById('resolvedContent').innerHTML = `
+    <div class="table-container">
+      <div class="table-header">
+        <h3>Resolved Stock-Outs — Back in Stock</h3>
+        <span class="count" style="background:var(--accent-green-dim); color:var(--accent-green)">${items.length} resolved</span>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr>
+            <th>Material</th><th>Description</th><th>Plant</th>
+            <th>Class</th><th>First Seen</th><th>Reason</th><th>Source</th>
+          </tr></thead>
+          <tbody>
+            ${items.map(item => `
+              <tr>
+                <td class="material-code">${item.material}</td>
+                <td>${item.description}</td>
+                <td class="material-code">${item.plant}</td>
+                <td><span class="class-badge ${(item.abcClass||'C').toLowerCase()}">${item.abcClass || '?'}</span></td>
+                <td style="font-size:11px; color:var(--text-muted)">${formatDate(item.firstSeen)}</td>
+                <td style="font-size:11px; color:var(--text-muted)">${item.reason || '—'}</td>
+                <td>${item.reasonSource ? `<span class="reason-source-tag ${item.reasonSource.toLowerCase()}">${item.reasonSource}</span>` : ''}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+}
+
+// ===================================================================
+// ██ TREND CHARTS
+// ===================================================================
+let trendChartInstance = null;
+let classChartInstance = null;
+
+function renderTrendCharts() {
+  const dates = Object.keys(store.dailyTotals).sort();
+  if (dates.length === 0) return;
+  if (trendChartInstance) trendChartInstance.destroy();
+  if (classChartInstance) classChartInstance.destroy();
+
+  trendChartInstance = new Chart(document.getElementById('trendChart'), {
+    type: 'line',
+    data: {
+      labels: dates.map(formatDate),
+      datasets: [
+        { label: 'Total OOS', data: dates.map(d => store.dailyTotals[d].total), borderColor: '#4a90d9', backgroundColor: 'rgba(74,144,217,0.08)', fill: true, tension: 0.3, pointRadius: 5, pointBackgroundColor: '#4a90d9', borderWidth: 2 },
+        { label: 'New', data: dates.map(d => store.dailyTotals[d].new), borderColor: '#e05555', fill: false, tension: 0.3, pointRadius: 4, pointBackgroundColor: '#e05555', borderWidth: 2, borderDash: [5,3] },
+        { label: 'Resolved', data: dates.map(d => store.dailyTotals[d].resolved), borderColor: '#3dbd7d', fill: false, tension: 0.3, pointRadius: 4, pointBackgroundColor: '#3dbd7d', borderWidth: 2, borderDash: [5,3] }
+      ]
+    },
+    options: chartOptions()
+  });
+
+  classChartInstance = new Chart(document.getElementById('classChart'), {
+    type: 'bar',
+    data: {
+      labels: dates.map(formatDate),
+      datasets: [
+        { label: 'Class A', data: dates.map(d => store.dailyTotals[d].a), backgroundColor: 'rgba(224,85,85,0.7)', borderRadius: 3 },
+        { label: 'Class B', data: dates.map(d => store.dailyTotals[d].b), backgroundColor: 'rgba(224,160,48,0.7)', borderRadius: 3 },
+        { label: 'Class C', data: dates.map(d => store.dailyTotals[d].c), backgroundColor: 'rgba(74,144,217,0.7)', borderRadius: 3 }
+      ]
+    },
+    options: { ...chartOptions(), scales: { ...chartOptions().scales, x: { ...chartOptions().scales.x, stacked: true }, y: { ...chartOptions().scales.y, stacked: true } } }
+  });
+}
+
+// ===================================================================
+// ██ WEEKLY PROJECTIONS (writes to Supabase)
+// ===================================================================
+function getMonday(d) { const date = new Date(d); const day = date.getDay(); const diff = date.getDate() - day + (day === 0 ? -6 : 1); date.setDate(diff); return date.toISOString().slice(0, 10); }
+function getFriday(mondayStr) { const d = new Date(mondayStr + 'T00:00:00'); d.setDate(d.getDate() + 4); return d.toISOString().slice(0, 10); }
+function isWeekday(dateStr) { const day = new Date(dateStr + 'T00:00:00').getDay(); return day >= 1 && day <= 5; }
+function formatWeekRange(weekStart, weekEnd) { return `${formatDate(weekStart)} — ${formatDate(weekEnd)}`; }
+
+function getNextWeekStarts(count) {
+  const today = new Date();
+  const thisMonday = getMonday(today);
+  const nextMonday = new Date(thisMonday + 'T00:00:00');
+  nextMonday.setDate(nextMonday.getDate() + 7);
+  const weeks = [];
+  for (let i = 0; i < count; i++) {
+    const ws = new Date(nextMonday);
+    ws.setDate(ws.getDate() + i * 7);
+    const weekStart = ws.toISOString().slice(0, 10);
+    weeks.push({ weekStart, weekEnd: getFriday(weekStart) });
+  }
+  return weeks;
+}
+
+function getWeeklyActual(weekStart, weekEnd) {
+  const dates = Object.keys(store.dailyTotals).filter(d => d >= weekStart && d <= weekEnd && isWeekday(d)).sort();
+  if (dates.length === 0) return null;
+  const sum = dates.reduce((acc, d) => acc + (store.dailyTotals[d]?.total || 0), 0);
+  return { sum, days: dates.length, avg: Math.round(sum / dates.length * 10) / 10 };
+}
+
+function isWeekComplete(weekStart, weekEnd) {
+  const today = new Date().toISOString().slice(0, 10);
+  if (weekEnd > today) return false;
+  const dates = Object.keys(store.dailyTotals).filter(d => d >= weekStart && d <= weekEnd && isWeekday(d));
+  return dates.length >= 3;
+}
+
+function getBestProjection(weekStart) {
+  const candidates = (store.projections || [])
+    .filter(p => p.weekStart === weekStart && p.entryDate < weekStart)
+    .sort((a, b) => b.entryDate.localeCompare(a.entryDate));
+  return candidates.length > 0 ? candidates[0] : null;
+}
+
+function renderWeeklyProjectionUI() {
+  const container = document.getElementById('projectionInputCards');
+  if (!container) return;
+  const weeks = getNextWeekStarts(2);
+  const today = new Date().toISOString().slice(0, 10);
+  const existingToday = (store.projections || []).filter(p => p.entryDate === today);
+
+  container.innerHTML = weeks.map((w, idx) => {
+    const label = idx === 0 ? 'Next Week' : 'Week After Next';
+    const existing = existingToday.find(p => p.weekStart === w.weekStart);
+    return `
+      <div class="proj-week-card">
+        <div class="proj-week-label">${label}</div>
+        <div class="proj-week-range">${formatWeekRange(w.weekStart, w.weekEnd)}</div>
+        <input class="proj-input" type="number" min="0"
+               id="projInput_${idx}"
+               data-week-start="${w.weekStart}"
+               data-week-end="${w.weekEnd}"
+               value="${existing ? existing.projected : ''}"
+               placeholder="Enter projected total OOS"
+               ${canEdit() ? '' : 'disabled'}>
+      </div>
+    `;
+  }).join('');
+
+  const note = document.getElementById('projHistoryNote');
+  if (note) {
+    const totalEntries = (store.projections || []).length;
+    const todayEntries = existingToday.length;
+    if (todayEntries > 0) note.textContent = `✓ ${todayEntries} projection(s) already saved today.`;
+    else if (totalEntries > 0) note.textContent = `${totalEntries} historical projection record(s) stored.`;
+    else note.textContent = 'No projections recorded yet.';
+  }
+}
+
+async function saveWeeklyProjections() {
+  if (!canEdit()) { showToast('You do not have edit permissions', 'error'); return; }
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = [];
+
+  document.querySelectorAll('.proj-input[data-week-start]').forEach(input => {
+    const val = input.value.trim();
+    if (val === '') return;
+    rows.push({ entry_date: today, week_start: input.dataset.weekStart, week_end: input.dataset.weekEnd, projected: parseInt(val) });
+  });
+
+  if (rows.length === 0) { showToast('Enter at least one projection value', 'error'); return; }
+
+  const { error } = await sb.from('projections').insert(rows);
+  if (error) { showToast('Save error: ' + error.message, 'error'); return; }
+
+  await loadAllData();
+  showToast(`${rows.length} weekly projection(s) saved`, 'success');
+}
+
+function buildWeeklyChartData() {
+  const weekSet = new Map();
+  (store.projections || []).forEach(p => {
+    if (!weekSet.has(p.weekStart)) weekSet.set(p.weekStart, { weekStart: p.weekStart, weekEnd: p.weekEnd });
+  });
+  Object.keys(store.dailyTotals).forEach(dateStr => {
+    if (!isWeekday(dateStr)) return;
+    const monday = getMonday(dateStr);
+    const friday = getFriday(monday);
+    if (!weekSet.has(monday)) weekSet.set(monday, { weekStart: monday, weekEnd: friday });
+  });
+  const weeks = [...weekSet.values()].sort((a, b) => a.weekStart.localeCompare(b.weekStart));
+  return weeks.map(w => {
+    const best = getBestProjection(w.weekStart);
+    const actual = getWeeklyActual(w.weekStart, w.weekEnd);
+    const complete = isWeekComplete(w.weekStart, w.weekEnd);
+    return { ...w, projected: best ? best.projected : null, projEntryDate: best ? best.entryDate : null, actualSum: actual ? actual.sum : null, actualAvg: actual ? actual.avg : null, actualDays: actual ? actual.days : 0, complete };
+  });
+}
+
+let projChartInstance = null;
+let accChartInstance = null;
+
+function renderWeeklyProjectionCharts() {
+  const canvas1 = document.getElementById('projChart');
+  if (!canvas1) return;
+  if (projChartInstance) projChartInstance.destroy();
+  if (accChartInstance) accChartInstance.destroy();
+  const weekData = buildWeeklyChartData();
+  if (weekData.length === 0) return;
+
+  projChartInstance = new Chart(canvas1, {
+    type: 'bar',
+    data: {
+      labels: weekData.map(w => `Wk ${formatDate(w.weekStart)}`),
+      datasets: [
+        { label: 'Actual (Weekly Total)', data: weekData.map(w => w.actualSum), backgroundColor: weekData.map(w => w.complete ? 'rgba(74,144,217,0.7)' : 'rgba(74,144,217,0.3)'), borderRadius: 4, order: 2 },
+        { label: 'Projected (Weekly Total)', data: weekData.map(w => w.projected), type: 'line', borderColor: '#9077e0', fill: false, tension: 0.3, pointRadius: 6, pointBackgroundColor: '#9077e0', borderWidth: 2.5, borderDash: [6, 3], spanGaps: true, order: 1 }
+      ]
+    },
+    options: chartOptions()
+  });
+
+  const accWeeks = weekData.filter(w => w.complete && w.projected !== null && w.actualSum !== null);
+  const canvas2 = document.getElementById('accuracyChart');
+  if (!canvas2 || accWeeks.length === 0) return;
+  const accValues = accWeeks.map(w => { if (w.projected === 0 && w.actualSum === 0) return 100; if (w.projected === 0) return 0; return Math.max(0, Math.round((1 - Math.abs(w.projected - w.actualSum) / w.projected) * 100)); });
+
+  accChartInstance = new Chart(canvas2, {
+    type: 'bar',
+    data: { labels: accWeeks.map(w => `Wk ${formatDate(w.weekStart)}`), datasets: [{ label: 'Accuracy %', data: accValues, backgroundColor: accValues.map(v => v >= 80 ? 'rgba(61,189,125,0.6)' : v >= 50 ? 'rgba(224,160,48,0.6)' : 'rgba(224,85,85,0.6)'), borderRadius: 4 }] },
+    options: { ...chartOptions(), scales: { ...chartOptions().scales, y: { ...chartOptions().scales.y, max: 100 } } }
+  });
+}
+
+function renderProjectionAccuracyTable() {
+  const tbody = document.getElementById('projAccuracyBody');
+  const countEl = document.getElementById('projAccCount');
+  if (!tbody) return;
+  const weekData = buildWeeklyChartData();
+  const withProj = weekData.filter(w => w.projected !== null);
+  if (countEl) countEl.textContent = `${withProj.length} weeks`;
+  if (withProj.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted)">No projection records yet</td></tr>'; return; }
+
+  tbody.innerHTML = withProj.reverse().map(w => {
+    const hasActual = w.complete && w.actualSum !== null;
+    const variance = hasActual ? w.actualSum - w.projected : null;
+    const pctError = hasActual && w.projected > 0 ? Math.round(Math.abs(variance) / w.projected * 100) : null;
+    const accuracy = pctError !== null ? Math.max(0, 100 - pctError) : null;
+    const varianceClass = variance === null ? '' : variance > 0 ? 'variance-positive' : variance < 0 ? 'variance-negative' : 'variance-zero';
+    const accColor = accuracy === null ? 'var(--text-muted)' : accuracy >= 80 ? 'var(--accent-green)' : accuracy >= 50 ? 'var(--accent-amber)' : 'var(--accent-red)';
+    return `<tr>
+      <td style="font-family:'JetBrains Mono',monospace; font-size:11px;">${formatDate(w.weekStart)} — ${formatDate(w.weekEnd)}</td>
+      <td style="font-size:11px; color:var(--text-muted)">${formatDate(w.projEntryDate)}</td>
+      <td style="font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--accent-purple)">${w.projected}</td>
+      <td style="font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--accent-blue)">${hasActual ? w.actualSum : '<span style="color:var(--text-muted)">⏳</span>'}</td>
+      <td class="${varianceClass}" style="font-family:'JetBrains Mono',monospace; font-weight:600">${variance !== null ? (variance > 0 ? '+' : '') + variance : '—'}</td>
+      <td style="font-family:'JetBrains Mono',monospace">${pctError !== null ? pctError + '%' : '—'}</td>
+      <td>${accuracy !== null ? `<span class="accuracy-bar" style="width:${Math.max(4, accuracy * 0.6)}px; background:${accColor}"></span><span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:${accColor}">${accuracy}%</span>` : '<span style="color:var(--text-muted)">Pending</span>'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ===================================================================
+// ██ HISTORY
+// ===================================================================
+function renderHistory() {
+  const matFilter = (document.getElementById('histFilterMat')?.value || '').toLowerCase();
+  const statusFilter = document.getElementById('histFilterStatus')?.value || '';
+  const classFilter = document.getElementById('histFilterClass')?.value || '';
+
+  const seen = new Set();
+  const unique = [];
+  const hist = store.history || [];
+  for (let i = hist.length - 1; i >= 0; i--) {
+    const h = hist[i];
+    const key = `${h.date}|${h.material}|${h.plant}|${h.status}`;
+    if (!seen.has(key)) { seen.add(key); unique.unshift(h); }
+  }
+
+  const filtered = unique.filter(h => {
+    if (matFilter && !h.material.toLowerCase().includes(matFilter) && !(h.description||'').toLowerCase().includes(matFilter)) return false;
+    if (statusFilter && h.status !== statusFilter) return false;
+    if (classFilter && (h.abcClass||'').toUpperCase() !== classFilter) return false;
+    return true;
+  });
+
+  document.getElementById('historyCount').textContent = `${filtered.length} records`;
+  const wrap = document.getElementById('historyTableWrap');
+  if (filtered.length === 0) { wrap.innerHTML = '<div class="empty-state" style="padding:40px"><h3>No records found</h3></div>'; return; }
+
+  wrap.innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Date</th><th>Material</th><th>Description</th><th>Plant</th>
+        <th>Class</th><th>Status</th><th>Reason</th><th>Source</th>
+      </tr></thead>
+      <tbody>
+        ${filtered.slice(-500).reverse().map(h => {
+          const src = store.reasonSources[`${h.material}|${h.plant}`] || '';
+          return `<tr>
+            <td style="font-size:11px; color:var(--text-muted)">${formatDate(h.date)}</td>
+            <td class="material-code">${h.material}</td>
+            <td>${h.description || ''}</td>
+            <td class="material-code">${h.plant}</td>
+            <td><span class="class-badge ${(h.abcClass||'c').toLowerCase()}">${h.abcClass || '?'}</span></td>
+            <td><span class="badge badge-${h.status.toLowerCase()}">${h.status}</span></td>
+            <td style="font-size:11px; color:var(--text-muted)">${h.reason || '—'}</td>
+            <td>${src ? `<span class="reason-source-tag ${src.toLowerCase()}">${src}</span>` : ''}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+// ===================================================================
+// ██ REASON ASSIGNMENT (writes to Supabase)
+// ===================================================================
+async function setReason(key, reason) {
+  if (!canEdit()) return;
+  await sb.from('reasons').upsert({ key, reason, source: reason ? 'Manual' : '' });
+  // Local update for instant feedback
+  store.reasons[key] = reason;
+  store.reasonSources[key] = reason ? 'Manual' : '';
+  currentViewData.current.forEach(i => { if (i.key === key) { i.reason = reason; i.reasonSource = reason ? 'Manual' : ''; }});
+  currentViewData.newItems.forEach(i => { if (i.key === key) { i.reason = reason; i.reasonSource = reason ? 'Manual' : ''; }});
+  renderDashboard();
+}
+
+// ===================================================================
+// ██ EXPORT
+// ===================================================================
+function exportCurrentView() {
+  const activeView = document.querySelector('.nav-tab.active')?.dataset.view;
+  let data = [];
+  let filename = 'oos_export.xlsx';
+
+  if (activeView === 'current' || activeView === 'dashboard') {
+    data = currentViewData.current.map(i => ({
+      Material: i.material, Description: i.description, Plant: i.plant,
+      'ABC Class': i.abcClass, Status: i.status, 'Days Out': i.daysOut,
+      'First Seen': i.firstSeen, Reason: i.reason, 'Reason Source': i.reasonSource, 'Sales MTD %': i.salesMtd
+    }));
+    filename = 'current_oos.xlsx';
+  } else if (activeView === 'new') {
+    data = currentViewData.newItems.map(i => ({
+      Material: i.material, Description: i.description, Plant: i.plant,
+      Div: i.div, 'ABC Class': i.abcClass, Reason: i.reason, 'Reason Source': i.reasonSource
+    }));
+    filename = 'new_oos.xlsx';
+  } else if (activeView === 'resolved') {
+    data = currentViewData.resolved.map(i => ({
+      Material: i.material, Description: i.description, Plant: i.plant,
+      'ABC Class': i.abcClass, Reason: i.reason, 'Reason Source': i.reasonSource
+    }));
+    filename = 'resolved_oos.xlsx';
+  } else if (activeView === 'history') {
+    data = (store.history || []).map(h => ({
+      Date: h.date, Material: h.material, Description: h.description, Plant: h.plant,
+      'ABC Class': h.abcClass, Status: h.status, Reason: h.reason, 'Reason Source': store.reasonSources[`${h.material}|${h.plant}`] || ''
+    }));
+    filename = 'oos_history.xlsx';
+  }
+
+  if (data.length === 0) { showToast('Nothing to export', 'info'); return; }
+  const ws = XLSX.utils.json_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Export');
+  XLSX.writeFile(wb, filename);
+  showToast(`Exported ${data.length} rows`, 'success');
+}
+
+// ===================================================================
+// ██ VIEW SWITCHING
+// ===================================================================
+function switchView(viewName) {
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.nav-tab[data-view="${viewName}"]`).classList.add('active');
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(`view-${viewName}`).classList.add('active');
+  if (viewName === 'trends') renderTrendCharts();
+  if (viewName === 'projections') { renderWeeklyProjectionUI(); renderWeeklyProjectionCharts(); renderProjectionAccuracyTable(); }
+}
+
+// ===================================================================
+// ██ RESET (admin only)
+// ===================================================================
+function showResetModal() { document.getElementById('resetModal').classList.add('show'); }
+function hideResetModal() { document.getElementById('resetModal').classList.remove('show'); }
+
+async function resetAllData() {
+  if (currentRole !== 'admin') { showToast('Admin access required', 'error'); return; }
+  setSyncStatus('syncing');
+
+  await Promise.all([
+    sb.from('snapshots').delete().neq('date', ''),
+    sb.from('reasons').delete().neq('key', ''),
+    sb.from('first_seen').delete().neq('key', ''),
+    sb.from('daily_totals').delete().neq('date', ''),
+    sb.from('projections').delete().gt('id', 0),
+    sb.from('history').delete().gt('id', 0),
+    sb.from('app_state').upsert({ key: 'lastLoadDate', value: 'null' }),
+    sb.from('app_state').upsert({ key: 'importLock', value: 'null' })
+  ]);
+
+  hideResetModal();
+  await loadAllData();
+  setSyncStatus('connected');
+  showToast('All data has been reset', 'info');
+}
+
+// ===================================================================
+// ██ UTILITIES
+// ===================================================================
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: '2-digit' });
+}
+
+function chartOptions() {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { color: '#8b90a0', font: { family: 'DM Sans', size: 12 }, usePointStyle: true, pointStyle: 'circle' } },
+      tooltip: { backgroundColor: '#1e2230', titleColor: '#e8eaf0', bodyColor: '#8b90a0', borderColor: '#353a4a', borderWidth: 1, cornerRadius: 8, titleFont: { family: 'DM Sans', size: 13 }, bodyFont: { family: 'JetBrains Mono', size: 12 } }
+    },
+    scales: {
+      x: { ticks: { color: '#5c6070', font: { family: 'DM Sans', size: 11 } }, grid: { color: 'rgba(42,46,58,0.5)' } },
+      y: { beginAtZero: true, ticks: { color: '#5c6070', font: { family: 'JetBrains Mono', size: 11 }, precision: 0 }, grid: { color: 'rgba(42,46,58,0.5)' } }
+    }
+  };
+}
+
+function showToast(message, type = 'info') {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.className = `toast ${type} show`;
+  setTimeout(() => toast.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>
