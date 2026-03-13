@@ -1196,7 +1196,7 @@ tbody tr.row-new:hover {
         <div>
           <div class="projection-input-panel" style="margin-bottom:20px;">
             <h3>Weekly Forecast Entry</h3>
-            <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">Enter projected total stock-outs for each week. Saved as a rolling forecast — historical entries are never overwritten.</p>
+            <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px;">Enter your projected daily average stock-outs for each week. Compared against actual daily average. Historical entries are never overwritten.</p>
             <div id="projectionInputCards"></div>
             <button class="btn btn-primary btn-sm" style="margin-top:14px; width:100%;" onclick="saveWeeklyProjections()">Save Projections</button>
             <div class="proj-history-note" id="projHistoryNote"></div>
@@ -1208,7 +1208,7 @@ tbody tr.row-new:hover {
         </div>
         <div>
           <div class="chart-container" style="margin-bottom:20px;">
-            <h3>Weekly Trend — Projected vs Actual</h3>
+            <h3>Weekly Trend — Projected vs Actual (Daily Avg)</h3>
             <div class="chart-wrap"><canvas id="projChart"></canvas></div>
           </div>
           <div class="table-container">
@@ -1219,7 +1219,7 @@ tbody tr.row-new:hover {
             <div class="table-scroll" style="max-height:400px;">
               <table class="proj-accuracy-table" id="projAccuracyTable">
                 <thead><tr>
-                  <th>Week</th><th>Entered On</th><th>Projected</th><th>Actual</th><th>Variance</th><th>% Error</th><th>Accuracy</th>
+                  <th>Week</th><th>Entered On</th><th>Proj Avg</th><th>Actual Avg</th><th>Variance</th><th>% Error</th><th>Accuracy</th>
                 </tr></thead>
                 <tbody id="projAccuracyBody"></tbody>
               </table>
@@ -2179,7 +2179,7 @@ function renderWeeklyProjectionUI() {
                data-week-start="${w.weekStart}"
                data-week-end="${w.weekEnd}"
                value="${existing ? existing.projected : ''}"
-               placeholder="Enter projected total OOS"
+               placeholder="Enter projected daily avg OOS"
                ${canEdit() ? '' : 'disabled'}>
       </div>
     `;
@@ -2251,17 +2251,17 @@ function renderWeeklyProjectionCharts() {
     data: {
       labels: weekData.map(w => `Wk ${formatDate(w.weekStart)}`),
       datasets: [
-        { label: 'Actual (Weekly Total)', data: weekData.map(w => w.actualSum), backgroundColor: weekData.map(w => w.complete ? 'rgba(74,144,217,0.7)' : 'rgba(74,144,217,0.3)'), borderRadius: 4, order: 2 },
-        { label: 'Projected (Weekly Total)', data: weekData.map(w => w.projected), type: 'line', borderColor: '#9077e0', fill: false, tension: 0.3, pointRadius: 6, pointBackgroundColor: '#9077e0', borderWidth: 2.5, borderDash: [6, 3], spanGaps: true, order: 1 }
+        { label: 'Actual (Daily Avg)', data: weekData.map(w => w.actualAvg), backgroundColor: weekData.map(w => w.complete ? 'rgba(74,144,217,0.7)' : 'rgba(74,144,217,0.3)'), borderRadius: 4, order: 2 },
+        { label: 'Projected (Daily Avg)', data: weekData.map(w => w.projected), type: 'line', borderColor: '#9077e0', fill: false, tension: 0.3, pointRadius: 6, pointBackgroundColor: '#9077e0', borderWidth: 2.5, borderDash: [6, 3], spanGaps: true, order: 1 }
       ]
     },
     options: chartOptions()
   });
 
-  const accWeeks = weekData.filter(w => w.complete && w.projected !== null && w.actualSum !== null);
+  const accWeeks = weekData.filter(w => w.complete && w.projected !== null && w.actualAvg !== null);
   const canvas2 = document.getElementById('accuracyChart');
   if (!canvas2 || accWeeks.length === 0) return;
-  const accValues = accWeeks.map(w => { if (w.projected === 0 && w.actualSum === 0) return 100; if (w.projected === 0) return 0; return Math.max(0, Math.round((1 - Math.abs(w.projected - w.actualSum) / w.projected) * 100)); });
+  const accValues = accWeeks.map(w => { if (w.projected === 0 && w.actualAvg === 0) return 100; if (w.projected === 0) return 0; return Math.max(0, Math.round((1 - Math.abs(w.projected - w.actualAvg) / w.projected) * 100)); });
 
   accChartInstance = new Chart(canvas2, {
     type: 'bar',
@@ -2280,8 +2280,8 @@ function renderProjectionAccuracyTable() {
   if (withProj.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:30px; color:var(--text-muted)">No projection records yet</td></tr>'; return; }
 
   tbody.innerHTML = withProj.reverse().map(w => {
-    const hasActual = w.complete && w.actualSum !== null;
-    const variance = hasActual ? w.actualSum - w.projected : null;
+    const hasActual = w.complete && w.actualAvg !== null;
+    const variance = hasActual ? Math.round((w.actualAvg - w.projected) * 10) / 10 : null;
     const pctError = hasActual && w.projected > 0 ? Math.round(Math.abs(variance) / w.projected * 100) : null;
     const accuracy = pctError !== null ? Math.max(0, 100 - pctError) : null;
     const varianceClass = variance === null ? '' : variance > 0 ? 'variance-positive' : variance < 0 ? 'variance-negative' : 'variance-zero';
@@ -2290,7 +2290,7 @@ function renderProjectionAccuracyTable() {
       <td style="font-family:'JetBrains Mono',monospace; font-size:11px;">${formatDate(w.weekStart)} — ${formatDate(w.weekEnd)}</td>
       <td style="font-size:11px; color:var(--text-muted)">${formatDate(w.projEntryDate)}</td>
       <td style="font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--accent-purple)">${w.projected}</td>
-      <td style="font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--accent-blue)">${hasActual ? w.actualSum : '<span style="color:var(--text-muted)">⏳</span>'}</td>
+      <td style="font-family:'JetBrains Mono',monospace; font-weight:600; color:var(--accent-blue)">${hasActual ? w.actualAvg : '<span style="color:var(--text-muted)">⏳</span>'}</td>
       <td class="${varianceClass}" style="font-family:'JetBrains Mono',monospace; font-weight:600">${variance !== null ? (variance > 0 ? '+' : '') + variance : '—'}</td>
       <td style="font-family:'JetBrains Mono',monospace">${pctError !== null ? pctError + '%' : '—'}</td>
       <td>${accuracy !== null ? `<span class="accuracy-bar" style="width:${Math.max(4, accuracy * 0.6)}px; background:${accColor}"></span><span style="font-family:'JetBrains Mono',monospace; font-weight:600; color:${accColor}">${accuracy}%</span>` : '<span style="color:var(--text-muted)">Pending</span>'}</td>
